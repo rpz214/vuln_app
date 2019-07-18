@@ -104,3 +104,4 @@ venv.bak/
 .mypy_cache/
 
 .idea
+vuln_app.db
