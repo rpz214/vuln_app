@@ -2,18 +2,24 @@ import hashlib
 import os
 import sqlite3
 
-from flask import Flask, render_template, redirect
+from flask import Flask, render_template, redirect, g
 from flask_wtf import FlaskForm
 from flask_login import LoginManager, current_user, login_user, login_required, logout_user
-from wtforms import StringField, PasswordField, SubmitField
-from wtforms.validators import DataRequired
+from wtforms import StringField, PasswordField, SubmitField, TextAreaField
+from wtforms.validators import DataRequired, Length
 
 
 class login_form(FlaskForm):
     """login form for flask"""
     username = StringField('Username', validators=[DataRequired()])
     password = PasswordField('Password', validators=[DataRequired()])
-    submit = SubmitField('Login')
+    login = SubmitField('Login')
+
+
+class post_form(FlaskForm):
+    """post form for flask"""
+    text = TextAreaField('Text here', validators=[DataRequired(), Length(min=1, max=200)])
+    post = SubmitField('Post')
 
 
 class user:
@@ -50,15 +56,12 @@ login.login_view = 'login'
 if os.path.exists(app.db):
     os.remove(app.db)
 # init db
-with sqlite3.connect(app.db) as conn:
-    c = conn.cursor()
-    c.execute("CREATE TABLE posts(author TEXT, body TEXT)")
-    c.execute("CREATE TABLE users(username TEXT, password TEXT)")
-    c.execute("INSERT INTO posts VALUES('test', 'Test')")
-    c.execute("INSERT INTO users VALUES('test', '{}')".format(get_hash('test')))
-    conn.commit()
-
-# TODO add post capability
+with sqlite3.connect(app.db) as db:
+    db.execute("CREATE TABLE posts(author TEXT, body TEXT)")
+    db.execute("CREATE TABLE users(username TEXT, password TEXT)")
+    db.execute("INSERT INTO posts VALUES('test', 'Test')")
+    db.execute("INSERT INTO users VALUES('test', '{}')".format(get_hash('test')))
+    db.commit()
 
 
 @login.user_loader
@@ -67,11 +70,17 @@ def load_user(username):
     return user(username)
 
 
-@app.route('/')
-@app.route('/index')
+@app.route('/', methods=['GET', 'POST'])
+@app.route('/index', methods=['GET', 'POST'])
 @login_required
 def index():
     """home page for posts"""
+    form = post_form()
+    if form.validate_on_submit():
+        with sqlite3.connect(app.db) as g.db:
+            g.db.execute("INSERT INTO posts VALUES('{}', '{}')".format(current_user, form.post.data))
+            g.db.commit()
+        return redirect('/index')
     # test without full db integration
     posts = [
         {
@@ -80,7 +89,7 @@ def index():
         }
     ]
     # TODO add db integration to posts
-    return render_template('index.html', title='Home', posts=posts)
+    return render_template('index.html', title='Home', form=form, posts=posts)
 
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -98,13 +107,12 @@ def login():
     if form.validate_on_submit():
         username = form.username.data
         password = form.password.data
-        db = sqlite3.connect(app.db)
-        result = db.execute(queryFormat.format(username, get_hash(password)))
-        if result.fetchone():
-            login_user(user(username))
-        else:
-            rd = '/login'
-        db.close()
+        with sqlite3.connect(app.db) as g.db:
+            result = g.db.execute(queryFormat.format(username, get_hash(password)))
+            if result.fetchone():
+                login_user(user(username))
+            else:
+                rd = '/login'
         return redirect(rd)
     # reached login page without submit
     return render_template('login.html', title='Login', form=form)
