@@ -3,14 +3,10 @@
 {% block content %}
     <h1>You are logged in as {{ current_user.username }}</h1>
     <form action="" method="post">
-        {{ form.hidden_tag() }}
-        <p>
-            {{ form.text.label }}<br>
-            {{ form.text(cols=50, rows=4) }}<br>
-        </p>
-        <p>{{ form.post() }}</p>
+        <input type="text" name="post"><br>
+        <input type="submit">
     </form>
     {% for post in posts %}
-    <div><p>{{ post.author.username }}: <b>{{ post.body }}</b></p></div>
+    <p>{{ post.author.username }}: {{ post.body }}</p>
     {% endfor %}
 {% endblock %}

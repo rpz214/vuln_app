@@ -39,6 +39,7 @@ class user:
 def get_hash(password):
     """Get sha512 hash"""
     # salting encourages safe sql queries so it is just avoided in this case
+    # example of weak authentication!
     sha512 = hashlib.sha512()
     password = password.encode('utf-8')
     sha512.update(password)
@@ -57,10 +58,10 @@ if os.path.exists(app.db):
     os.remove(app.db)
 # init db
 with sqlite3.connect(app.db) as db:
-    db.execute("CREATE TABLE posts(author TEXT, body TEXT)")
-    db.execute("CREATE TABLE users(username TEXT, password TEXT)")
-    db.execute("INSERT INTO posts VALUES('test', 'Test')")
-    db.execute("INSERT INTO users VALUES('test', '{}')".format(get_hash('test')))
+    db.execute('CREATE TABLE posts(author TEXT, body TEXT)')
+    db.execute('CREATE TABLE users(username TEXT, password TEXT)')
+    db.execute('INSERT INTO posts VALUES("test", "db test")')
+    db.execute('INSERT INTO users VALUES("test", "{}")'.format(get_hash('test')))
     db.commit()
 
 
@@ -78,17 +79,13 @@ def index():
     form = post_form()
     if form.validate_on_submit():
         with sqlite3.connect(app.db) as g.db:
-            g.db.execute("INSERT INTO posts VALUES('{}', '{}')".format(current_user, form.post.data))
+            g.db.execute('INSERT INTO posts VALUES("{}", "{}")'.format(current_user.username, form.text.data))
             g.db.commit()
         return redirect('/index')
-    # test without full db integration
-    posts = [
-        {
-            'author': {'username': 'test'},
-            'body': 'No db test'
-        }
-    ]
-    # TODO add db integration to posts
+    # db integration
+    with sqlite3.connect(app.db) as g.db:
+        posts = g.db.execute('SELECT * from posts')
+        posts = [{'author': {'username': author}, 'body': body} for author, body in posts.fetchall()]
     return render_template('index.html', title='Home', form=form, posts=posts)
 
 
@@ -96,6 +93,7 @@ def index():
 def login():
     """login page"""
     # this is an unsafe query
+    # example of SQLI!
     queryFormat = 'SELECT * from users WHERE username = "{}" AND password = "{}"'
     # starting redirect
     rd = '/index'
